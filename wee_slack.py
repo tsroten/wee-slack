@@ -2026,8 +2026,11 @@ def pending_requests_cb(data, remaining_calls):
     global pending_requests, inflight_requests
     if len(pending_requests) > 0 and inflight_requests < 5:
         r = pending_requests.pop(0)
-        w.hook_process_hashtable(r["url"], r["params"], 20000, "url_processor_cb", pickle.dumps(r["context"]))
+        w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
         inflight_requests += 1
+    elif inflight_requests < 0:
+        inflight_requests = 0
+
     return w.WEECHAT_RC_OK
 
 def async_slack_api_upload_request(token, request, post_data, priority=False):
@@ -2081,6 +2084,7 @@ def url_processor_cb(data, command, return_code, out, err):
                         channels.find(my_json["channel"]["id"]).members = set(my_json["channel"]["members"])
     else:
         if return_code != -1:
+            inflight_requests -= 1
             big_data.pop(identifier, None)
         dbg("return code: {}, data: {}, output: {}, error: {}".format(return_code, data, out, err))
 
@@ -2292,7 +2296,7 @@ if __name__ == "__main__":
             w.hook_timer(3000, 0, 0, "slack_connection_persistence_cb", "")
 
             # attach to the weechat hooks we need
-            w.hook_timer(50, 0, 0, "pending_requests_cb", "")
+            w.hook_timer(500, 0, 0, "pending_requests_cb", "")
             w.hook_timer(1000, 0, 0, "typing_update_cb", "")
             w.hook_timer(1000, 0, 0, "buffer_list_update_cb", "")
             w.hook_timer(1000, 0, 0, "hotlist_cache_update_cb", "")
