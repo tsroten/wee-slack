@@ -2028,6 +2028,7 @@ def pending_requests_cb(data, remaining_calls):
         r = pending_requests.pop(0)
         w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
         inflight_requests += 1
+    #FIXME: we should fix this properly. timeouts on the callback aren't caught properly, so inflight goes negative sometimes.
     elif inflight_requests < 0:
         inflight_requests = 0
 
