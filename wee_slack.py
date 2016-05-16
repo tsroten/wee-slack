@@ -2008,6 +2008,7 @@ def complete_next_cb(data, buffer, command):
 
 inflight_requests = 0
 pending_requests = []
+last_rtm_start = 0
 # NOTE: switched to async because sync slowed down the UI
 def async_slack_api_request(domain, token, request, post_data, priority=False):
     global pending_requests
@@ -2023,16 +2024,28 @@ def async_slack_api_request(domain, token, request, post_data, priority=False):
         #w.hook_process_hashtable(url, params, 20000, "url_processor_cb", context)
 
 def pending_requests_cb(data, remaining_calls):
-    global pending_requests, inflight_requests
+    global pending_requests, inflight_requests, last_rtm_start
     if len(pending_requests) > 0 and inflight_requests < 5:
         r = pending_requests.pop(0)
-        w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
-        inflight_requests += 1
+        #move rtm.starts to the end to spread them out
+        if r["url"].find("rtm.start") > -1 and rtm_start_holdback():
+            pending_requests.append(r)
+        else:
+            w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
+            inflight_requests += 1
     #FIXME: we should fix this properly. timeouts on the callback aren't caught properly, so inflight goes negative sometimes.
     elif inflight_requests < 0:
         inflight_requests = 0
 
     return w.WEECHAT_RC_OK
+
+def rtm_start_holdback():
+    global last_rtm_start
+    if int(time.time()) > last_rtm_start + 5:
+        last_rtm_start = int(time.time())
+        return True
+    print "delayed rtm start"
+    return False
 
 def async_slack_api_upload_request(token, request, post_data, priority=False):
     if not STOP_TALKING_TO_SLACK:
