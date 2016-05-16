@@ -2006,15 +2006,29 @@ def complete_next_cb(data, buffer, command):
 
 # Slack specific requests
 
+inflight_requests = 0
+pending_requests = []
 # NOTE: switched to async because sync slowed down the UI
 def async_slack_api_request(domain, token, request, post_data, priority=False):
+    global pending_requests
     if not STOP_TALKING_TO_SLACK:
         post_data["token"] = token
         url = 'url:https://{}/api/{}?{}'.format(domain, request, urllib.urlencode(post_data))
         context = pickle.dumps({"request": request, "token": token, "post_data": post_data})
         params = { 'useragent': 'wee_slack {}'.format(SCRIPT_VERSION) }
         dbg("URL: {} context: {} params: {}".format(url, context, params))
-        w.hook_process_hashtable(url, params, 20000, "url_processor_cb", context)
+        #w.hook_process_hashtable(url, params, 20000, "url_processor_cb", context)
+        pending_requests.append({"url": url, "params": params, "context": pickle.loads(context)})
+        #pending_requests.append({"url": url, "params": params, "context", context})
+        #w.hook_process_hashtable(url, params, 20000, "url_processor_cb", context)
+
+def pending_requests_cb(data, remaining_calls):
+    global pending_requests, inflight_requests
+    if len(pending_requests) > 0 and inflight_requests < 5:
+        r = pending_requests.pop(0)
+        w.hook_process_hashtable(r["url"], r["params"], 20000, "url_processor_cb", pickle.dumps(r["context"]))
+        inflight_requests += 1
+    return w.WEECHAT_RC_OK
 
 def async_slack_api_upload_request(token, request, post_data, priority=False):
     if not STOP_TALKING_TO_SLACK:
@@ -2022,12 +2036,14 @@ def async_slack_api_upload_request(token, request, post_data, priority=False):
         file_path = os.path.expanduser(post_data["file"])
         command = 'curl -F file=@{} -F channels={} -F token={} {}'.format(file_path, post_data["channels"], token, url)
         context = pickle.dumps({"request": request, "token": token, "post_data": post_data})
-        w.hook_process(command, 20000, "url_processor_cb", context)
+        #w.hook_process(command, 20000, "url_processor_cb", context)
 
 # funny, right?
 big_data = {}
 
 def url_processor_cb(data, command, return_code, out, err):
+    global pending_requests, inflight_requests
+    print inflight_requests
     global big_data
     data = pickle.loads(data)
     identifier = sha.sha("{}{}".format(data, command)).hexdigest()
@@ -2035,6 +2051,7 @@ def url_processor_cb(data, command, return_code, out, err):
         big_data[identifier] = ''
     big_data[identifier] += out
     if return_code == 0:
+        inflight_requests -= 1
         try:
             my_json = json.loads(big_data[identifier])
         except:
@@ -2275,6 +2292,7 @@ if __name__ == "__main__":
             w.hook_timer(3000, 0, 0, "slack_connection_persistence_cb", "")
 
             # attach to the weechat hooks we need
+            w.hook_timer(50, 0, 0, "pending_requests_cb", "")
             w.hook_timer(1000, 0, 0, "typing_update_cb", "")
             w.hook_timer(1000, 0, 0, "buffer_list_update_cb", "")
             w.hook_timer(1000, 0, 0, "hotlist_cache_update_cb", "")
