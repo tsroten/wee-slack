@@ -2031,7 +2031,9 @@ def pending_requests_cb(data, remaining_calls):
         if r["url"].find("rtm.start") > -1 and rtm_start_holdback():
             pending_requests.append(r)
         else:
-            w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
+            asdf = w.hook_process_hashtable(r["url"], r["params"], 60000, "url_processor_cb", pickle.dumps(r["context"]))
+            print asdf
+            print type(asdf)
             inflight_requests += 1
     #FIXME: we should fix this properly. timeouts on the callback aren't caught properly, so inflight goes negative sometimes.
     elif inflight_requests < 0:
