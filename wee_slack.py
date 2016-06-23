@@ -90,7 +90,11 @@ class SearchList(list):
         super(SearchList, self).__init__(self)
 
     def find(self, name):
-        if name in self.hashtable.keys():
+        k = self.hashtable.keys()
+        if name in k:
+            #throw away the hashtable if there is more than one match.
+            if k.count(name) > 1:
+                self.update_hashtable()
             return self.hashtable[name]
         #this is a fallback to __eq__ if the item isn't in the hashtable already
         if self.count(name) > 0:
