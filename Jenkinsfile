@@ -15,12 +15,14 @@ pipeline {
         }
       }
     }
-    stage('') {
+    stage('test') {
       steps {
-        dir(path: '/home/deploy/playbooks') {
-          sh 'echo "Done!";'
-        }
-
+        dir(path: '/home/deploy/playbooks')
+      }
+    }
+    stage('echo') {
+      steps {
+        sh 'echo "Done!";'
       }
     }
   }
