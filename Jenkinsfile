@@ -15,11 +15,6 @@ pipeline {
         }
       }
     }
-    stage('test') {
-      steps {
-        dir(path: '/home/deploy/playbooks')
-      }
-    }
     stage('echo') {
       steps {
         sh 'echo "Done!";'
